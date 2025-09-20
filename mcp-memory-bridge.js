@@ -142,14 +142,28 @@ app.get("/mcp/sse", requireAuth, async (req, res) => {
   });
 });
 
-// REST API to add a memory
 app.post("/memories", requireAuth, (req, res) => {
-  const { text, type="", tags="", meta = null } = req.body;
+  const { text, type = "", tags = "", meta = null } = req.body;
   if (!text) return res.status(400).json({ error: "text required" });
+
+  // Check for duplicate by exact text match
+  const existing = db.prepare("SELECT id FROM memories WHERE text = ?").get(text);
+  if (existing) {
+    return res.json({ ok: false, msg: "duplicate", id: existing.id });
+  }
+
   const ts = new Date().toISOString();
-  insertStmt.run({ ts, type, tags, text, meta: meta ? JSON.stringify(meta) : null });
+  insertStmt.run({
+    ts,
+    type,
+    tags,
+    text,
+    meta: meta ? JSON.stringify(meta) : null
+  });
+
   return res.json({ ok: true });
 });
+
 
 // Search
 app.get("/memories/search", requireAuth, (req, res) => {
