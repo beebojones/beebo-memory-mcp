@@ -34,12 +34,14 @@ const initDb = () => {
       type TEXT,
       tags TEXT,
       text TEXT NOT NULL,
-      meta TEXT
+      meta TEXT,
+      embedding TEXT
     )
   `).run();
   return db;
 };
 const db = initDb();
+
 
 // Prepared statements
 const insertStmt = db.prepare("INSERT INTO memories (ts,type,tags,text,meta) VALUES (@ts,@type,@tags,@text,@meta)");
