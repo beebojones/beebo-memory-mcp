@@ -54,14 +54,15 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
-// Simple auth middleware
 function requireAuth(req, res, next) {
-  const token = req.header("x-mcp-token");
+  // Accept token from header OR query parameter
+  const token = req.header("x-mcp-token") || req.query.token;
   if (!token || token !== AUTH_TOKEN) {
     return res.status(401).json({ error: "unauthorized" });
   }
   next();
 }
+
 
 // Helper: format SSE event
 function sseFormat(obj) {
