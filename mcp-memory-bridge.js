@@ -172,6 +172,12 @@ app.delete("/memories/:id", requireAuth, (req,res) => {
   res.json({ deleted: info.changes });
 });
 
+// Dump all memories (debug only!)
+app.get("/memories/all", requireAuth, (req, res) => {
+  const rows = selectAllStmt.all(500); // adjust limit if you want
+  res.json(rows);
+});
+
 app.listen(PORT, () => {
   console.log(`MCP Memory Bridge running on port ${PORT}`);
 });
