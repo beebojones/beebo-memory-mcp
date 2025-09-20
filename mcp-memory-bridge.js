@@ -146,10 +146,20 @@ app.post("/memories", requireAuth, (req, res) => {
   const { text, type = "", tags = "", meta = null } = req.body;
   if (!text) return res.status(400).json({ error: "text required" });
 
-  // Check for duplicate by exact text match
-  const existing = db.prepare("SELECT id FROM memories WHERE text = ?").get(text);
+  // Normalize text for comparison
+  const normText = text.trim().toLowerCase();
+
+  // Check for duplicate (case-insensitive)
+  const existing = db.prepare(
+    "SELECT id, text FROM memories WHERE lower(trim(text)) = ?"
+  ).get(normText);
+
   if (existing) {
-    return res.json({ ok: false, msg: "duplicate", id: existing.id });
+    return res.json({
+      ok: false,
+      msg: "duplicate",
+      existing: existing
+    });
   }
 
   const ts = new Date().toISOString();
@@ -163,6 +173,7 @@ app.post("/memories", requireAuth, (req, res) => {
 
   return res.json({ ok: true });
 });
+
 
 
 // Search
