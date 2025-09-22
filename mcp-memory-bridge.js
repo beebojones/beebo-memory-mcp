@@ -205,10 +205,12 @@ app.delete("/memories/:id", requireAuth, (req,res) => {
   res.json({ deleted: info.changes });
 });
 
+app.get("/version", (req, res) => {
+  res.json({ version: "embeddings + all route v2" });
+});
+
 app.listen(PORT, () => {
   console.log(`MCP Memory Bridge running on port ${PORT}`);
 });
 
-app.get("/version", (req, res) => {
-  res.json({ version: "embeddings + all route v2" });
-});
+
