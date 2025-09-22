@@ -186,6 +186,12 @@ app.get("/memories/search", requireAuth, (req, res) => {
   res.json(rows);
 });
 
+// Dump all memories (debug only!)
+app.get("/memories/all", requireAuth, (req, res) => {
+  const rows = selectAllStmt.all(500); // adjust limit if you want
+  res.json(rows);
+});
+
 // Get by id
 app.get("/memories/:id", requireAuth, (req,res) => {
   const row = getById.get(req.params.id);
@@ -197,12 +203,6 @@ app.get("/memories/:id", requireAuth, (req,res) => {
 app.delete("/memories/:id", requireAuth, (req,res) => {
   const info = deleteStmt.run(req.params.id);
   res.json({ deleted: info.changes });
-});
-
-// Dump all memories (debug only!)
-app.get("/memories/all", requireAuth, (req, res) => {
-  const rows = selectAllStmt.all(500); // adjust limit if you want
-  res.json(rows);
 });
 
 app.listen(PORT, () => {
