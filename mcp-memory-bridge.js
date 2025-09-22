@@ -17,6 +17,16 @@ import cors from "cors";
 import dotenv from "dotenv";
 import fetch from "node-fetch";
 
+function cosineSimilarity(a, b) {
+  let dot = 0, na = 0, nb = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    na += a[i] * a[i];
+    nb += b[i] * b[i];
+  }
+  return dot / (Math.sqrt(na) * Math.sqrt(nb));
+}
+
 dotenv.config();
 const PORT = process.env.PORT || 3000;
 const AUTH_TOKEN = process.env.MCP_BRIDGE_TOKEN || "change-me";
@@ -144,37 +154,76 @@ app.get("/mcp/sse", requireAuth, async (req, res) => {
   });
 });
 
-app.post("/memories", requireAuth, (req, res) => {
+app.post("/memories", requireAuth, async (req, res) => {
   const { text, type = "", tags = "", meta = null } = req.body;
   if (!text) return res.status(400).json({ error: "text required" });
 
-  // Normalize text for comparison
-  const normText = text.trim().toLowerCase();
+  const normText = text.trim();
+  const ts = new Date().toISOString();
 
-  // Check for duplicate (case-insensitive)
+  // 1. Exact duplicate check
   const existing = db.prepare(
     "SELECT id, text FROM memories WHERE lower(trim(text)) = ?"
-  ).get(normText);
+  ).get(normText.toLowerCase());
 
   if (existing) {
-    return res.json({
-      ok: false,
-      msg: "duplicate",
-      existing: existing
-    });
+    return res.json({ ok: false, msg: "duplicate", existing });
   }
 
-  const ts = new Date().toISOString();
-  insertStmt.run({
+  // 2. Embedding duplicate check
+  let embedding = null;
+  if (OPENAI_KEY) {
+    try {
+      const resp = await fetch("https://api.openai.com/v1/embeddings", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${OPENAI_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          input: normText,
+          model: "text-embedding-3-small"
+        }),
+      });
+      const data = await resp.json();
+      embedding = data.data[0].embedding;
+
+      // Compare with existing embeddings
+      const rows = db.prepare("SELECT id, text, embedding FROM memories").all();
+      for (const row of rows) {
+        if (!row.embedding) continue;
+        const sim = cosineSimilarity(embedding, JSON.parse(row.embedding));
+        if (sim > 0.9) {  // adjust threshold as needed
+          return res.json({
+            ok: false,
+            msg: "semantic duplicate",
+            similarity: sim,
+            existing: { id: row.id, text: row.text }
+          });
+        }
+      }
+    } catch (err) {
+      console.error("Embedding fetch failed", err);
+    }
+  }
+
+  // 3. Insert new memory
+  const info = insertStmt.run({
     ts,
     type,
     tags,
-    text,
+    text: normText,
     meta: meta ? JSON.stringify(meta) : null
   });
 
+  if (embedding) {
+    db.prepare("UPDATE memories SET embedding = ? WHERE id = ?")
+      .run(JSON.stringify(embedding), info.lastInsertRowid);
+  }
+
   return res.json({ ok: true });
 });
+
 
 
 
