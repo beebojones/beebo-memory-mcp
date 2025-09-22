@@ -208,3 +208,7 @@ app.get("/memories/all", requireAuth, (req, res) => {
 app.listen(PORT, () => {
   console.log(`MCP Memory Bridge running on port ${PORT}`);
 });
+
+app.get("/version", (req, res) => {
+  res.json({ version: "embeddings + all route v2" });
+});
