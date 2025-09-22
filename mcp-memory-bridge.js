@@ -55,7 +55,7 @@ const db = initDb();
 
 // Prepared statements
 const insertStmt = db.prepare("INSERT INTO memories (ts,type,tags,text,meta) VALUES (@ts,@type,@tags,@text,@meta)");
-const selectAllStmt = db.prepare("SELECT * FROM memories ORDER BY id DESC LIMIT ?");
+const selectAllStmt = db.prepare("SELECT * FROM memories ORDER BY id ASC LIMIT ?");
 const selectSinceStmt = db.prepare("SELECT * FROM memories WHERE id <= ? ORDER BY id DESC LIMIT ?");
 const searchStmt = db.prepare("SELECT * FROM memories WHERE text LIKE @q OR tags LIKE @q ORDER BY id DESC LIMIT @limit");
 const getById = db.prepare("SELECT * FROM memories WHERE id = ?");
