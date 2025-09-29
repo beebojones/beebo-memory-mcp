@@ -29,11 +29,11 @@ async function initDb() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS memories (
       id SERIAL PRIMARY KEY,
-      ts TEXT NOT NULL,
+      ts TEXT,
       type TEXT,
-      tags TEXT,
+      tags JSONB,
       text TEXT NOT NULL,
-      meta TEXT,
+      meta JSONB,
       embedding TEXT
     )
   `);
@@ -69,7 +69,7 @@ function sseFormat(obj) {
 
 async function synthSummary(items) {
   if (!OPENAI_KEY) return null;
-  const prompt = `You are a helpful assistant. Summarize these memory items into a short friendly list (3 bullets max):\n\n${JSON.stringify(items.map(i=>({id:i.id, ts:i.ts, text:i.text, tags:i.tags})),null,2)}`;
+  const prompt = `Summarize these memory items into 3 bullets:\n\n${JSON.stringify(items.map(i => ({id:i.id, ts:i.ts, text:i.text, tags:i.tags})),null,2)}`;
   try {
     const resp = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -92,6 +92,22 @@ async function synthSummary(items) {
 }
 
 // --- Routes ---
+// Place by-tag route *before* :id route
+app.get("/memories/by-tag", requireAuth, async (req, res) => {
+  try {
+    const tag = req.query.tag;
+    if (!tag) return res.status(400).json({ error: "tag required" });
+    const { rows } = await pool.query(
+      "SELECT * FROM memories WHERE tags @> $1::jsonb ORDER BY id DESC LIMIT 50",
+      [JSON.stringify([tag])]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("Route error /memories/by-tag:", err);
+    res.status(500).json({ error: "server error" });
+  }
+});
+
 app.get("/mcp/sse", requireAuth, async (req, res) => {
   res.writeHead(200, {
     "Content-Type": "text/event-stream",
@@ -124,59 +140,69 @@ app.get("/mcp/sse", requireAuth, async (req, res) => {
 });
 
 app.post("/memories", requireAuth, async (req, res) => {
-  const { text, type = "", tags = "", meta = null } = req.body;
-  if (!text) return res.status(400).json({ error: "text required" });
+  try {
+    const { text, type = "", tags = [], meta = null } = req.body;
+    if (!text) return res.status(400).json({ error: "text required" });
 
-  const normText = text.trim();
-  const ts = new Date().toISOString();
+    const normText = text.trim();
+    const ts = new Date().toISOString();
 
-  // Exact duplicate check
-  const dupCheck = await pool.query("SELECT id, text FROM memories WHERE lower(trim(text)) = lower(trim($1))", [normText]);
-  if (dupCheck.rows.length > 0) {
-    return res.json({ ok: false, msg: "duplicate", existing: dupCheck.rows[0] });
-  }
-
-  // Embedding duplicate check
-  let embedding = null;
-  if (OPENAI_KEY) {
-    try {
-      const resp = await fetch("https://api.openai.com/v1/embeddings", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${OPENAI_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ input: normText, model: "text-embedding-3-small" }),
-      });
-      const data = await resp.json();
-      embedding = data.data[0].embedding;
-
-      const existingRows = await pool.query("SELECT id, text, embedding FROM memories WHERE embedding IS NOT NULL");
-      for (const row of existingRows.rows) {
-        const sim = cosineSimilarity(embedding, JSON.parse(row.embedding));
-        if (sim > 0.9) {
-          return res.json({ ok: false, msg: "semantic duplicate", similarity: sim, existing: { id: row.id, text: row.text } });
-        }
-      }
-    } catch (err) {
-      console.error("Embedding fetch failed", err);
+    // Exact duplicate check
+    const dupCheck = await pool.query("SELECT id, text FROM memories WHERE lower(trim(text)) = lower(trim($1))", [normText]);
+    if (dupCheck.rows.length > 0) {
+      return res.json({ ok: false, msg: "duplicate", existing: dupCheck.rows[0] });
     }
+
+    // Embedding duplicate check
+    let embedding = null;
+    if (OPENAI_KEY) {
+      try {
+        const resp = await fetch("https://api.openai.com/v1/embeddings", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${OPENAI_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ input: normText, model: "text-embedding-3-small" }),
+        });
+        const data = await resp.json();
+        embedding = data.data[0].embedding;
+
+        const existingRows = await pool.query("SELECT id, text, embedding FROM memories WHERE embedding IS NOT NULL");
+        for (const row of existingRows.rows) {
+          const sim = cosineSimilarity(embedding, JSON.parse(row.embedding));
+          if (sim > 0.9) {
+            return res.json({ ok: false, msg: "semantic duplicate", similarity: sim, existing: { id: row.id, text: row.text } });
+          }
+        }
+      } catch (err) {
+        console.error("Embedding fetch failed", err);
+      }
+    }
+
+    // Insert
+    const result = await pool.query(
+      "INSERT INTO memories (ts,type,tags,text,meta,embedding) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id",
+      [ts, type, JSON.stringify(tags), normText, meta ? JSON.stringify(meta) : null, embedding ? JSON.stringify(embedding) : null]
+    );
+
+    return res.json({ ok: true, id: result.rows[0].id });
+  } catch (err) {
+    console.error("Route error /memories:", err);
+    res.status(500).json({ error: "server error" });
   }
-
-  // Insert
-  const result = await pool.query(
-    "INSERT INTO memories (ts,type,tags,text,meta,embedding) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id",
-    [ts, type, tags, normText, meta ? JSON.stringify(meta) : null, embedding ? JSON.stringify(embedding) : null]
-  );
-
-  return res.json({ ok: true, id: result.rows[0].id });
 });
 
 app.get("/memories/search", requireAuth, async (req, res) => {
-  const q = `%${(req.query.q || "").replace(/%/g,"")}%`;
-  const limit = parseInt(req.query.limit || "25", 10);
-  const { rows } = await pool.query("SELECT * FROM memories WHERE text ILIKE $1 OR tags ILIKE $1 ORDER BY id DESC LIMIT $2", [q, limit]);
-  res.json(rows);
+  try {
+    const q = `%${(req.query.q || "").replace(/%/g,"")}%`;
+    const limit = parseInt(req.query.limit || "25", 10);
+    const { rows } = await pool.query("SELECT * FROM memories WHERE text ILIKE $1 OR tags::text ILIKE $1 ORDER BY id DESC LIMIT $2", [q, limit]);
+    res.json(rows);
+  } catch (err) {
+    console.error("Route error /memories/search:", err);
+    res.status(500).json({ error: "server error" });
+  }
 });
 
 app.get("/memories/all", requireAuth, async (req, res) => {
@@ -184,10 +210,16 @@ app.get("/memories/all", requireAuth, async (req, res) => {
   res.json(rows);
 });
 
+// must come after by-tag
 app.get("/memories/:id", requireAuth, async (req, res) => {
-  const { rows } = await pool.query("SELECT * FROM memories WHERE id = $1", [req.params.id]);
-  if (rows.length === 0) return res.status(404).json({ error: "not found" });
-  res.json(rows[0]);
+  try {
+    const { rows } = await pool.query("SELECT * FROM memories WHERE id = $1", [req.params.id]);
+    if (rows.length === 0) return res.status(404).json({ error: "not found" });
+    res.json(rows[0]);
+  } catch (err) {
+    console.error("Route error /memories/:id:", err);
+    res.status(500).json({ error: "server error" });
+  }
 });
 
 app.delete("/memories/:id", requireAuth, async (req, res) => {
@@ -196,7 +228,7 @@ app.delete("/memories/:id", requireAuth, async (req, res) => {
 });
 
 app.get("/version", (req, res) => {
-  res.json({ version: "postgres + embeddings v1" });
+  res.json({ version: "postgres + embeddings v2" });
 });
 
 app.listen(PORT, () => {
