@@ -16,10 +16,20 @@ const pool = new Pool({
 app.get("/ping", async (req, res) => {
   try {
     const result = await pool.query("SELECT NOW()");
-    res.json({ ok: true, message: "pong", db: "connected", time: result.rows[0].now });
+    res.json({
+      ok: true,
+      message: "pong",
+      db: "connected",
+      time: result.rows[0].now
+    });
   } catch (err) {
     console.error("Ping DB error:", err);
-    res.status(500).json({ ok: false, message: "pong", db: "error", error: err.message });
+    res.status(500).json({
+      ok: false,
+      message: "pong",
+      db: "error",
+      error: err.message
+    });
   }
 });
 
@@ -116,6 +126,14 @@ app.get("/memories/:id", async (req, res) => {
     console.error("Error fetching memory by ID:", err);
     res.status(500).json({ ok: false, error: err.message });
   }
+});
+
+// --- Version endpoint ---
+app.get("/version", (req, res) => {
+  res.json({
+    version: "postgres + embeddings v1",
+    commit: process.env.RENDER_GIT_COMMIT || "unknown"
+  });
 });
 
 // --- Start server ---
