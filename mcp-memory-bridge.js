@@ -33,12 +33,12 @@ app.get("/ping", async (req, res) => {
 // 🧾 Version check
 app.get("/version", (req, res) => {
   res.json({
-    version: "postgres + embeddings v2",
+    version: "postgres + recall v1",
     commit: process.env.RENDER_GIT_COMMIT || "local-dev",
   });
 });
 
-// 🧠 Add or update memory (with last_updated)
+// 🧠 Add or update memory
 app.post("/memories", async (req, res) => {
   const token = req.headers["x-mcp-token"];
   if (token !== process.env.MCP_TOKEN)
@@ -88,6 +88,45 @@ app.get("/memories/all", async (req, res) => {
     const result = await pool.query("SELECT * FROM memories ORDER BY last_updated DESC");
     res.json(result.rows);
   } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// 🔍 Recall memory by natural language query
+app.get("/memories/recall", async (req, res) => {
+  const token = req.query.token;
+  const query = req.query.q;
+
+  if (token !== process.env.MCP_TOKEN)
+    return res.status(401).json({ ok: false, error: "Invalid or missing token" });
+  if (!query)
+    return res.status(400).json({ ok: false, error: "Missing q parameter" });
+
+  try {
+    // Fuzzy text search using ILIKE
+    const result = await pool.query(
+      `
+      SELECT id, text, tags, type, source, created_at, last_updated
+      FROM memories
+      WHERE text_norm ILIKE $1
+      ORDER BY last_updated DESC
+      LIMIT 3;
+      `,
+      [`%${query.toLowerCase()}%`]
+    );
+
+    if (result.rows.length === 0) {
+      return res.json({ ok: true, found: false, message: "No matching memories found." });
+    }
+
+    res.json({
+      ok: true,
+      found: true,
+      count: result.rows.length,
+      memories: result.rows,
+    });
+  } catch (err) {
+    console.error("Error recalling memory:", err);
     res.status(500).json({ ok: false, error: err.message });
   }
 });
