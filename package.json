@@ -5,7 +5,12 @@
   "description": "",
   "main": "mcp-memory-bridge.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node mcp-memory-bridge.js",
+    "dev": "nodemon mcp-memory-bridge.js",
+    "agent": "node agent.cjs",
+    "listener": "node listener.cjs",
+    "test:routes": "cmd /c test_routes.bat",
+    "test:memories": "cmd /c test_memories.bat"
   },
   "keywords": [],
   "author": "",

@@ -1,0 +1,59 @@
+{
+  "name": "Beebo Memory Agent",
+  "description": "AI assistant connected to the Beebo Memory MCP Bridge",
+  "model": {
+    "provider": "openai",
+    "model": "gpt-5",
+    "temperature": 0.7
+  },
+  "voice": {
+    "provider": "openai",
+    "voice": "alloy",
+    "rate": 1.0
+  },
+  "memory": {
+    "enabled": true,
+    "provider": "mcp",
+    "server": "beebo-memory-mcp"
+  },
+  "mcpServers": {
+    "beebo-memory-mcp": {
+      "type": "rest",
+      "endpoints": {
+        "addMemory": {
+          "url": "https://beebo-memory-mcp.onrender.com/memories?token=Zedy1101",
+          "method": "POST",
+          "body": {
+            "text": "{text}",
+            "type": "{type}",
+            "tags": "{tags}",
+            "source": "agent"
+          },
+          "headers": {
+            "Content-Type": "application/json",
+            "x-mcp-token": "Zedy1101"
+          }
+        },
+        "recallMemory": {
+          "url": "https://beebo-memory-mcp.onrender.com/memories/recall?token=Zedy1101&q={query}",
+          "method": "GET",
+          "headers": {
+            "Accept": "application/json"
+          }
+        },
+        "getAllMemories": {
+          "url": "https://beebo-memory-mcp.onrender.com/memories/all?token=Zedy1101",
+          "method": "GET"
+        }
+      }
+    }
+  },
+  "behavior": {
+    "memoryPolicy": {
+      "saveOnUserMessage": true,
+      "autoRecall": true
+    },
+    "contextWindow": 20,
+    "onStartupSay": "Memory bridge connected and ready."
+  }
+}
