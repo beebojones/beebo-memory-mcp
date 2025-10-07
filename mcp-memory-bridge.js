@@ -81,7 +81,7 @@ app.post("/memories", async (req, res) => {
 app.get("/memories/all", async (req, res) => {
   try {
     const token = req.query.token;
-    if (token !== process.env.MCP_TOKEN)
+    if (token !== process.env.MCP_BRIDGE_TOKEN)
       return res.status(401).json({ ok: false, error: "Invalid or missing token" });
 
     const result = await pool.query(
