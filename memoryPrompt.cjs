@@ -3,7 +3,7 @@ require("dotenv").config();
 const axios = require("axios");
 
 const BASE_URL = "https://beebo-memory-mcp.onrender.com";
-const TOKEN = process.env.MCP_BRIDGE_TOKEN || "Zedy1101";
+const TOKEN = process.env.MCP_TOKEN || "Zedy1101";
 
 // Simple helper to recall information from memory
 async function recallFromMemory(query) {

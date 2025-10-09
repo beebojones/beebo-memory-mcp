@@ -1,0 +1,8 @@
+# syntax=docker/dockerfile:1
+node_modules
+npm-debug.log*
+.env
+logs
+coverage
+dist
+build

@@ -19,6 +19,7 @@ function extractNames(text) {
   const raw = text.match(/\b[A-Z][a-z]+\b/g) || [];
   const ignore = new Set([
     "I", "My", "Today", "Tomorrow", "Tonight", "This", "Next",
+    "What", "When", "Remember",
     "Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday",
     "Jan","Feb","Mar","Apr","May","Jun","July","Aug","Sep","Sept","Oct","Nov","Dec"
   ]);
@@ -103,11 +104,13 @@ rl.on("line", async (rawLine) => {
       const phrase = text.replace(/^remember\s+/i, "").trim();
       await addMemory(phrase);
     } else if (lower.startsWith("when ")) {
-      const name = extractNames(text)[0];
+      const names = extractNames(text);
+      const name = names.length ? names[names.length - 1] : null;
       if (!name) return console.log("🤔 Whose meeting are you asking about?");
       await recallMemory(name);
     } else if (lower.startsWith("what ")) {
-      const name = extractNames(text)[0];
+      const names = extractNames(text);
+      const name = names.length ? names[names.length - 1] : null;
       if (!name) return console.log("🤔 Whose item are you asking about?");
       await recallMemory(name);
     } else {

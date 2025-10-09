@@ -9,8 +9,19 @@
     "dev": "nodemon mcp-memory-bridge.js",
     "agent": "node agent.cjs",
     "listener": "node listener.cjs",
+    "chat": "node chat.cjs",
+    "params": "node scripts/param-provider.cjs",
     "test:routes": "cmd /c test_routes.bat",
-    "test:memories": "cmd /c test_memories.bat"
+    "test:memories": "cmd /c test_memories.bat",
+    "lint": "eslint . --ext .js,.cjs,.mjs",
+    "lint:fix": "eslint . --ext .js,.cjs,.mjs --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "migrate:up": "node-pg-migrate up",
+    "migrate:down": "node-pg-migrate down",
+    "compose:up": "docker compose up -d",
+    "compose:down": "docker compose down",
+    "compose:logs": "docker compose logs -f app"
   },
   "keywords": [],
   "author": "",
@@ -26,5 +37,12 @@
     "openai": "^6.0.0",
     "pg": "^8.16.3",
     "uuid": "^13.0.0"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "node-pg-migrate": "^7.6.1",
+    "nodemon": "^3.0.0",
+    "prettier": "^3.3.3"
   }
 }
